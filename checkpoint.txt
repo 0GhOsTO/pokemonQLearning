@@ -1,0 +1,61 @@
+Pokemon Q-Learning Assignment Progress
+Due: Wednesday 12/10/2025 @ 11:59pm EST
+Started: November 22, 2025
+
+WE Decided to use the R(s,a,s') reward function type since it is more informative for our agent. 
+
+=== TASK CHECKLIST ===
+
+[✓] Task 4: Copy Files
+    - Copy lib/pokePA-<VERSION>.jar
+    - Copy lib/argparse4j-<VERSION>.jar  
+    - Copy lib/junit-<VERSION>.jar
+    - Copy lib/hamcrest-<VERSION>.jar
+    - Copy src/pas directory
+    - Copy pokePA.srcs file
+    - Copy doc/pas directory
+
+[✓] Task 5: Test Run
+    - Compile the code
+    - Run RandomBattle to verify setup
+
+[ ] Task 8: Implement CustomSensorArray
+    - Design how neural network perceives the battle
+    - Design how neural network perceives actions
+    - Implement getSensorValues() method
+
+[ ] Task 9: Implement PolicyAgent
+    - initializeSenses()
+    - initialize()
+    - initModel()
+    - chooseNextPokemon()
+    - getMove()
+    - afterGameEnds()
+    - Optional: argmax() with transition model
+    - Optional: makeGroundTruth() with transition model
+
+[ ] Task 10: Implement CustomRewardFunction
+    - Choose reward function type: R(s), R(s,a), or R(s,a,s')
+    - Implement reward calculation
+    - Optional: Reward shaping
+
+[ ] Task 11-12: Training
+    - Develop code locally
+    - Test locally
+    - Set up SCC training
+    - Monitor training progress
+    - Plot learning curves
+    - Select best model
+
+[ ] Task 14: Submission
+    - Rename best model to params.model
+    - Submit all Java files
+    - Submit params.model
+
+=== CURRENT STATUS ===
+Working on: Task 8 - CustomSensorArray Implementation
+
+NEXT STEPS:
+1. Design sensor strategy - decide what features to extract from BattleView
+2. Implement getSensorValues() in CustomSensorArray.java
+3. Update initModel() in PolicyAgent.java to match sensor count
