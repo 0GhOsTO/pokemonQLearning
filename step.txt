@@ -1,0 +1,411 @@
+POKEMON Q-LEARNING IMPLEMENTATION PLAN
+Due: Wednesday 12/10/2025 @ 11:59pm EST
+Reward Type: R(s,a,s') - Transition-based (Most Powerful)
+
+================================================================================
+STEP 1: IMPLEMENT CustomRewardFunction (15-30 min)
+================================================================================
+File: src/pas/pokemon/rewards/CustomRewardFunction.java
+
+1.1 Change RewardType in constructor:
+    super(RewardType.STATE_ACTION_STATE);
+
+1.2 Set finite reward bounds:
+    getLowerBound() → return -1000.0;
+    getUpperBound() → return +1000.0;
+
+1.3 Implement getStateActionStateReward(state, action, nextState):
+    
+    REWARD STRATEGY:
+    - Opponent's Pokemon fainted: +500
+    - My Pokemon fainted: -500
+    - Damage dealt to opponent: +damage/10
+    - Damage taken by me: -damage/10
+    - Status inflicted on opponent: +50
+    - Status inflicted on me: -50
+    - Battle won: +1000
+    - Battle lost: -1000
+    
+    IMPLEMENTATION TIPS:
+    - Compare state vs nextState to see what changed
+    - Use view.getMyTeamView() and view.getOpponentTeamView()
+    - Check Pokemon HP: pokemonView.getCurrentHP()
+    - Check if fainted: pokemonView.hasFainted()
+    - Check battle end: view.hasEnded()
+
+STATUS: [ ] Not started  [ ] In progress  [ ] Complete
+
+================================================================================
+STEP 2: IMPLEMENT CustomSensorArray (30-60 min)
+================================================================================
+File: src/pas/pokemon/senses/CustomSensorArray.java
+
+2.1 Design sensor architecture (60-100 total features)
+
+2.2 STATE FEATURES (~50-80 numbers):
+    
+    MY ACTIVE POKEMON (~15 features):
+    - Current HP / Max HP (normalized 0-1)
+    - Attack stat (normalized)
+    - Defense stat (normalized)
+    - Special Attack stat (normalized)
+    - Special Defense stat (normalized)
+    - Speed stat (normalized)
+    - Level (normalized)
+    - Type 1 (one-hot encoding, 18 types)
+    - Type 2 (one-hot encoding, 18 types)
+    - Status condition (one-hot: healthy, burn, freeze, paralyze, poison, sleep)
+    - Stage modifiers: Attack, Defense, SpAtk, SpDef, Speed, Accuracy, Evasion
+    
+    OPPONENT ACTIVE POKEMON (~15 features):
+    - Same features as above
+    
+    MY TEAM INFO (~10 features):
+    - Number of alive Pokemon / 6
+    - Average HP% of team
+    - Total remaining HP% of team
+    - Strongest Pokemon HP%
+    
+    OPPONENT TEAM INFO (~10 features):
+    - Same features as above
+    
+    BATTLE STATE (~5 features):
+    - Turn number (normalized)
+    - Weather condition (one-hot)
+    - Terrain (one-hot)
+
+2.3 ACTION FEATURES (~10-20 numbers):
+    - Move power (normalized 0-1, divide by 250)
+    - Move accuracy (0-1)
+    - Move type (one-hot encoding)
+    - Move category: Physical/Special/Status (one-hot)
+    - Type effectiveness multiplier (0.0, 0.25, 0.5, 1.0, 2.0, 4.0)
+    - Priority (normalized)
+    - Is switch move? (0 or 1)
+
+2.4 Implementation structure:
+    public Matrix getSensorValues(final BattleView state, final MoveView action)
+    {
+        List<Double> sensors = new ArrayList<>();
+        
+        // Extract my active pokemon features
+        sensors.addAll(extractPokemonFeatures(myActivePokemon));
+        
+        // Extract opponent active pokemon features
+        sensors.addAll(extractPokemonFeatures(oppActivePokemon));
+        
+        // Extract team features
+        sensors.addAll(extractTeamFeatures(myTeam));
+        sensors.addAll(extractTeamFeatures(oppTeam));
+        
+        // Extract action features
+        sensors.addAll(extractMoveFeatures(action, myActivePokemon, oppActivePokemon));
+        
+        // Convert List<Double> to Matrix row vector
+        return listToMatrix(sensors);
+    }
+
+2.5 Helper methods to create:
+    - extractPokemonFeatures(PokemonView pokemon)
+    - extractTeamFeatures(TeamView team)
+    - extractMoveFeatures(MoveView move, PokemonView attacker, PokemonView defender)
+    - oneHotEncodeType(String type)
+    - calculateTypeEffectiveness(MoveView move, PokemonView defender)
+    - listToMatrix(List<Double> values)
+
+TOTAL SENSOR COUNT: ~70-100 (track exact number!)
+
+STATUS: [ ] Not started  [ ] In progress  [ ] Complete
+
+================================================================================
+STEP 3: IMPLEMENT PolicyAgent (45-60 min)
+================================================================================
+File: src/pas/pokemon/agents/PolicyAgent.java
+
+3.1 initModel() - Create neural network architecture
+    
+    INPUT SIZE = Number of sensors from CustomSensorArray (e.g., 80)
+    OUTPUT SIZE = 1 (Q-value estimate)
+    
+    RECOMMENDED ARCHITECTURE:
+    Sequential qFunction = new Sequential();
+    qFunction.add(new Dense(80, 256));    // Input: 80 sensors → 256 neurons
+    qFunction.add(new ReLU());            // Activation
+    qFunction.add(new Dense(256, 128));   // Hidden layer
+    qFunction.add(new ReLU());            // Activation
+    qFunction.add(new Dense(128, 64));    // Hidden layer
+    qFunction.add(new ReLU());            // Activation
+    qFunction.add(new Dense(64, 1));      // Output: Q-value
+    return qFunction;
+    
+    NOTE: Adjust first layer input size to match your exact sensor count!
+
+3.2 getMove(BattleView view) - Epsilon-greedy exploration
+    
+    STRATEGY:
+    - Start with high exploration (ε = 0.5)
+    - Gradually decay to low exploration (ε = 0.05)
+    - During evaluation, always use ε = 0 (pure exploitation)
+    
+    PSEUDOCODE:
+    public MoveView getMove(BattleView view)
+    {
+        if (isTraining()) {
+            double epsilon = calculateEpsilon();  // Decay over time
+            if (Math.random() < epsilon) {
+                return getRandomMove(view);  // Explore
+            }
+        }
+        return this.argmax(view);  // Exploit (best Q-value)
+    }
+    
+    IMPLEMENTATION TIPS:
+    - Track episode number or total moves to decay epsilon
+    - Linear decay: ε = max(0.05, 0.5 - episode * 0.0001)
+    - Exponential decay: ε = 0.05 + (0.5 - 0.05) * exp(-episode / 1000)
+    - Store epsilon as a field in the class
+
+3.3 chooseNextPokemon(BattleView view) - Smart switching
+    
+    STRATEGY OPTIONS:
+    A. Simple: Choose alive Pokemon with highest HP
+    B. Type advantage: Choose Pokemon with good type matchup
+    C. Q-based: Use model to evaluate each switch option
+    
+    RECOMMENDED (Type advantage):
+    public Integer chooseNextPokemon(BattleView view)
+    {
+        TeamView myTeam = this.getMyTeamView(view);
+        PokemonView oppActive = this.getOpponentActivePokemon(view);
+        
+        int bestIdx = -1;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        
+        for (int idx = 0; idx < myTeam.size(); idx++) {
+            PokemonView pokemon = myTeam.getPokemonView(idx);
+            if (!pokemon.hasFainted() && idx != myTeam.getActivePokemonIndex()) {
+                double score = evaluateSwitchOption(pokemon, oppActive);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestIdx = idx;
+                }
+            }
+        }
+        return bestIdx;
+    }
+    
+    Helper: evaluateSwitchOption(pokemon, opponent)
+    - Calculate type effectiveness
+    - Consider HP percentage
+    - Consider stat advantages
+
+3.4 afterGameEnds(BattleView view) - Optional logging
+    
+    OPTIONAL FEATURES:
+    - Log win/loss statistics
+    - Save model checkpoints every N episodes
+    - Print training progress
+    - Track average reward per episode
+
+STATUS: [ ] Not started  [ ] In progress  [ ] Complete
+
+================================================================================
+STEP 4: LOCAL TESTING (30-60 min)
+================================================================================
+
+4.1 Compile the code:
+    PowerShell command:
+    javac -cp "lib/*" '@pokePA.srcs'
+
+4.2 Run short training test:
+    java -cp "lib/*;." edu.bu.pas.pokemon.training.Train `
+        --numEpisodes 10 `
+        --discountFactor 0.99 `
+        --learningRate 0.001 `
+        --batchSize 32 `
+        --replayBufferSize 10000 `
+        --agentClass src.pas.pokemon.agents.PolicyAgent `
+        --outFile testmodel.model
+
+4.3 Check for errors:
+    - Compilation errors? Fix syntax
+    - Runtime errors? Add debug prints
+    - NaN values? Check sensor normalization
+    - No learning? Check reward signals
+
+4.4 Verify rewards make sense:
+    - Add print statements in CustomRewardFunction
+    - Check that winning gives positive rewards
+    - Check that losing gives negative rewards
+    - Verify rewards are within bounds
+
+4.5 Test against RandomAgent:
+    java -cp "lib/*;." edu.bu.pas.pokemon.core.CustomBattle `
+        --agentAClass src.pas.pokemon.agents.PolicyAgent `
+        --agentBClass edu.bu.pas.pokemon.agents.RandomAgent `
+        --numGames 10 `
+        --inFile testmodel.model
+
+STATUS: [ ] Not started  [ ] In progress  [ ] Complete
+
+================================================================================
+STEP 5: TRAINING ON SCC (Days)
+================================================================================
+
+5.1 Upload code to SCC:
+    - scp all files to SCC cluster
+    - Module load java
+    - Verify compilation on SCC
+
+5.2 Create training script (train.sh):
+    #!/bin/bash
+    #$ -l h_rt=48:00:00
+    #$ -N pokemon_train
+    #$ -j y
+    #$ -o train.log
+    
+    module load java
+    
+    java -cp "lib/*:." edu.bu.pas.pokemon.training.Train \
+        --numEpisodes 50000 \
+        --discountFactor 0.99 \
+        --learningRate 0.001 \
+        --batchSize 64 \
+        --replayBufferSize 50000 \
+        --agentClass src.pas.pokemon.agents.PolicyAgent \
+        --outFile model_50k.model \
+        --saveEvery 1000
+
+5.3 Submit job:
+    qsub train.sh
+
+5.4 Monitor progress:
+    - tail -f train.log
+    - Check for learning curve improvements
+    - Average reward should increase over time
+    - Win rate should improve
+
+5.5 Hyperparameter tuning:
+    Try variations:
+    - Learning rate: 0.0001, 0.001, 0.01
+    - Batch size: 32, 64, 128
+    - Network architecture: wider/deeper
+    - Epsilon decay rate
+    - Reward scaling
+
+STATUS: [ ] Not started  [ ] In progress  [ ] Complete
+
+================================================================================
+STEP 6: EVALUATION & SUBMISSION
+================================================================================
+
+6.1 Test against EASY (Brock):
+    Target: 100% win rate (10/10 battles)
+    java -cp "lib/*;." edu.bu.pas.pokemon.core.CustomBattle \
+        --agentAClass src.pas.pokemon.agents.PolicyAgent \
+        --agentBName Brock \
+        --numGames 10 \
+        --inFile model_best.model
+
+6.2 Test against MEDIUM (Sabrina):
+    Target: 75% win rate (7.5/10 battles)
+    java -cp "lib/*;." edu.bu.pas.pokemon.core.CustomBattle \
+        --agentAClass src.pas.pokemon.agents.PolicyAgent \
+        --agentBName Sabrina \
+        --numGames 10 \
+        --inFile model_best.model
+
+6.3 Test against HARD (Lance):
+    Target: 50% win rate (5/10 battles)
+    java -cp "lib/*;." edu.bu.pas.pokemon.core.CustomBattle \
+        --agentAClass src.pas.pokemon.agents.PolicyAgent \
+        --agentBName Lance \
+        --numGames 10 \
+        --inFile model_best.model
+
+6.4 Select best model:
+    - Compare multiple trained models
+    - Pick model with best overall performance
+    - Rename: mv model_best.model params.model
+
+6.5 Prepare submission:
+    Files to submit:
+    - src/pas/pokemon/agents/PolicyAgent.java
+    - src/pas/pokemon/senses/CustomSensorArray.java
+    - src/pas/pokemon/rewards/CustomRewardFunction.java
+    - params.model (your trained model)
+
+6.6 Submit before deadline:
+    Wednesday 12/10/2025 @ 11:59pm EST
+
+STATUS: [ ] Not started  [ ] In progress  [ ] Complete
+
+================================================================================
+EXTRA CREDIT: Beat Trainer Red (+50 points)
+================================================================================
+Extremely difficult custom agent - requires excellent strategy!
+
+STATUS: [ ] Not started  [ ] In progress  [ ] Complete
+
+================================================================================
+TOURNAMENT ELIGIBILITY REQUIREMENTS
+================================================================================
+Must meet ALL:
+- Submitted on time
+- Code compiles
+- Beats EASY 100% (10/10)
+- Beats MEDIUM 60% (6/10)
+- Beats HARD 40% (4/10)
+
+STATUS: [ ] Eligible  [ ] Not eligible
+
+================================================================================
+KEY INSIGHTS & TIPS
+================================================================================
+
+REWARD DESIGN:
+- Make rewards informative but not too sparse
+- Combine multiple reward signals (reward shaping)
+- Normalize rewards to reasonable scale (-1000 to +1000)
+- Give partial credit for progress (damage dealt, etc.)
+
+SENSOR DESIGN:
+- Normalize all features to similar scales (0-1 or -1 to +1)
+- Include both state and action information
+- Type effectiveness is crucial for Pokemon
+- Don't include redundant features
+
+NETWORK ARCHITECTURE:
+- Deeper networks learn complex strategies
+- But can be slower to train and overfit
+- Start with 2-3 hidden layers
+- Use ReLU activations (not Sigmoid/Tanh in hidden layers)
+
+EXPLORATION:
+- High initial epsilon (0.5) to discover strategies
+- Gradual decay to exploitation (0.05)
+- Never fully remove exploration during training
+- Use pure exploitation (ε=0) only for evaluation
+
+TRAINING:
+- More episodes = better performance (50k+ recommended)
+- Save models frequently to avoid losing progress
+- Monitor learning curves for convergence
+- Try multiple hyperparameter settings
+
+DEBUGGING:
+- Print sensor values to check normalization
+- Print rewards to verify they make sense
+- Log win/loss stats to track progress
+- Visualize Q-values to understand agent decisions
+
+COMMON PITFALLS:
+- Forgetting to normalize sensor values → Poor learning
+- Reward too sparse → Agent never learns
+- No exploration → Stuck in local optimum
+- Wrong sensor count in initModel() → Dimension mismatch
+- Training too short → Underfitted model
+
+================================================================================
+END OF IMPLEMENTATION PLAN
+================================================================================
