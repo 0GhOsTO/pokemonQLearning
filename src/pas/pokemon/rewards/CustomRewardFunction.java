@@ -22,12 +22,12 @@ public class CustomRewardFunction
 
     public double getLowerBound() {
         // TODO: change this. Reward values must be finite!
-        return -1000.0;
+        return -3000.0;
     }
 
     public double getUpperBound() {
         // TODO: change this. Reward values must be finite!
-        return 1000.0;
+        return 3000.0;
     }
 
     // NOT USED
