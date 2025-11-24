@@ -9,6 +9,7 @@ import edu.bu.pas.pokemon.core.Pokemon;
 import edu.bu.pas.pokemon.core.Battle.BattleView;
 import edu.bu.pas.pokemon.core.Move.MoveView;
 import edu.bu.pas.pokemon.core.Pokemon.PokemonView;
+import edu.bu.pas.pokemon.core.enums.NonVolatileStatus;
 import edu.bu.pas.pokemon.core.enums.Stat;
 import edu.bu.pas.pokemon.core.Team.TeamView;
 
@@ -22,12 +23,12 @@ public class CustomRewardFunction
 
     public double getLowerBound() {
         // TODO: change this. Reward values must be finite!
-        return -3000.0;
+        return -5000.0;
     }
 
     public double getUpperBound() {
         // TODO: change this. Reward values must be finite!
-        return 3000.0;
+        return 5000.0;
     }
 
     // NOT USED
@@ -45,6 +46,7 @@ public class CustomRewardFunction
             final MoveView action,
             final BattleView nextState) {
         double reward = 0.0;
+
         // Treating team 2 as the oponent.
         TeamView myTeam = state.getTeam1View();
         TeamView oppTeam = state.getTeam2View();
@@ -60,9 +62,9 @@ public class CustomRewardFunction
         // If the battle is over ...
         if (nextState.isOver()) {
             if (teamDead(oppNxtTeam)) {
-                reward += 1000.0; // Win
+                reward += 2500.0; // Win
             } else if (teamDead(myNxtTeam)) {
-                reward -= 1000.0; // Lose
+                reward -= 2500.0; // Lose
             }
             // Game is over
             return reward;
@@ -70,44 +72,47 @@ public class CustomRewardFunction
 
         // Pokemon dead.
         if (oppPokemon != null && oppNxtPokemon != null) {
-            if (!oppNxtPokemon.hasFainted() && oppPokemon.hasFainted()) {
-                reward += 500.0; // Opponent pokemon dead.
+            if (!oppPokemon.hasFainted() && oppNxtPokemon.hasFainted()) {
+                reward += 800.0; // Opponent pokemon dead.
             }
         }
         if (myPokemon != null && myNxtPokemon != null) {
-            if (!myNxtPokemon.hasFainted() && myPokemon.hasFainted()) {
-                reward -= 500.0; // My pokemon dead.
+            if (!myPokemon.hasFainted() && myNxtPokemon.hasFainted()) {
+                reward -= 800.0; // My pokemon dead.
             }
         }
 
         // Pokemon damaging.
         if (oppPokemon != null && oppNxtPokemon != null) {
             double oppHpDiff = oppPokemon.getCurrentStat(Stat.HP) - oppNxtPokemon.getCurrentStat(Stat.HP);
-            reward += oppHpDiff; // Opponent getting damaged.
+            reward += oppHpDiff * 1.2; // Opponent getting damaged.
         }
         if (myPokemon != null && myNxtPokemon != null) {
             double myHpDiff = myPokemon.getCurrentStat(Stat.HP) - myNxtPokemon.getCurrentStat(Stat.HP);
-            reward -= myHpDiff; // My pokemon getting damaged.
+            reward -= myHpDiff * 1.2; // My pokemon getting damaged.
         }
 
         // Condition based rewarding.
         if (oppPokemon != null && oppNxtPokemon != null) {
-            String oppStatus = oppPokemon.getNonVolatileStatus().toString();
-            String oppNxtStatus = oppNxtPokemon.getNonVolatileStatus().toString();
+            NonVolatileStatus oppStatus = oppPokemon.getNonVolatileStatus();
+            NonVolatileStatus oppNxtStatus = oppNxtPokemon.getNonVolatileStatus();
 
-            if (oppStatus.equals("NONE") && !oppNxtStatus.equals("NONE")) {
-                reward += 50.0; // Opponent getting status condition.
+            if (oppStatus == NonVolatileStatus.NONE && oppNxtStatus != NonVolatileStatus.NONE) {
+                reward += getStatusReward(oppNxtStatus); // Opponent getting status condition.
             }
         }
 
         if (myPokemon != null && myNxtPokemon != null) {
-            String myStatus = myPokemon.getNonVolatileStatus().toString();
-            String myNxtStatus = myNxtPokemon.getNonVolatileStatus().toString();
+            NonVolatileStatus myStatus = myPokemon.getNonVolatileStatus();
+            NonVolatileStatus myNxtStatus = myNxtPokemon.getNonVolatileStatus();
 
-            if (myStatus.equals("NONE") && !myNxtStatus.equals("NONE")) {
-                reward -= 50.0; // My pokemon getting status condition.
+            if (myStatus == NonVolatileStatus.NONE && myNxtStatus != NonVolatileStatus.NONE) {
+                reward -= getStatusReward(myNxtStatus); // My pokemon getting status condition.
             }
         }
+
+        reward += calcBoostReward(myPokemon, myNxtPokemon, true);
+        reward += calcBoostReward(oppPokemon, oppNxtPokemon, false);
 
         int myTeamTotHP = getTeamTotHP(myNxtTeam);
         int oppTeamTotHP = getTeamTotHP(oppNxtTeam);
@@ -115,7 +120,15 @@ public class CustomRewardFunction
         int prevOppTeamTotHP = getTeamTotHP(oppTeam);
 
         int hpDiff = (prevMyTeamTotHP - myTeamTotHP) - (prevOppTeamTotHP - oppTeamTotHP);
-        reward += hpDiff / 50.0; // Team HP difference, we reward.
+        reward -= hpDiff / 40.0; // Team HP difference, we reward.
+
+        if (action != null && action.getPower() != null) {
+            Integer moveP = action.getPower();
+            // Plenalty for the bad move.
+            if (moveP < 40 && moveP > 0) {
+                reward -= 20.0; // Penalize low power moves.
+            }
+        }
 
         return reward;
     }
@@ -130,6 +143,57 @@ public class CustomRewardFunction
             }
         }
         return totHP;
+    }
+
+    private double getStatusReward(NonVolatileStatus status) {
+        switch (status) {
+            case TOXIC:
+                return 120.0; // continuous escalating damage
+            case BURN:
+                return 90.0; // damage + attack reduction
+            case PARALYSIS:
+                return 90.0; // speed reduction
+            case POISON:
+                return 70.0; // continuous damage
+            case SLEEP:
+                return 100.0; // pokemon can't move for multiple turns
+            case FREEZE:
+                return 100.0; // similar to sleep
+            default:
+                return 0.0;
+        }
+    }
+
+    private double calcBoostReward(PokemonView before, PokemonView after, boolean isMine) {
+        double boost = 0.0;
+
+        Stat[] checkStats = {
+                Stat.ATK,
+                Stat.DEF,
+                Stat.SPD,
+                Stat.SPATK,
+                Stat.SPDEF,
+                Stat.ACC,
+                Stat.EVASIVE
+        };
+
+        for (Stat stat : checkStats) {
+            int beforeBoost = before.getStatMultiplier(stat);
+            int afterBoost = after.getStatMultiplier(stat);
+            int diff = afterBoost - beforeBoost;
+            if (diff != 0) {
+                double multiplier = 1.0;
+                if (stat == Stat.ATK || stat == Stat.SPATK || stat == Stat.SPD) {
+                    multiplier = 1.5; // Prioritize offensive/speed stats for sweepers.
+                }
+                if (isMine) {
+                    boost += diff * 30.0 * multiplier; // Reward my boosts.
+                } else {
+                    boost -= diff * 30.0 * multiplier; // Penalize opponent's boosts.
+                }
+            }
+        }
+        return boost;
     }
 
     // Whole team is dead.

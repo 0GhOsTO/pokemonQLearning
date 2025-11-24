@@ -1,0 +1,244 @@
+Explanation: This file describes competitive Pokémon strategy in a way suitable for a reinforcement-learning reward system. It contains clarified, self-contained explanations of key concepts taken from the competitive battling guide.
+
+Competitive battling is fundamentally different from in-game battling. Real players switch strategically, punish bad moves, use coverage, set hazards, use support moves, and play around long-term win conditions. A team does not consist of six isolated Pokémon; every action must support a team strategy.
+
+A sweeper is a Pokémon whose role is to defeat multiple opponents consecutively, often after boosting its stats with moves like Dragon Dance, Swords Dance, Calm Mind, or Quiver Dance. The team’s win condition usually revolves around enabling the sweeper to finish the game. Strategic play aims to weaken its counters, provide safe entry, and create battlefield conditions that let the sweeper clean up.
+
+Coverage refers to moves chosen to hit types that resist your main attacks. Example: a Fire-type using Focus Blast to hit Rock-types. Good coverage prevents the opponent from switching safely.
+
+Support moves include non-damaging utility such as Toxic, Will-O-Wisp, Thunder Wave, Substitute, Roost, Wish, Rapid Spin, and hazard-setting moves like Stealth Rock or Spikes. Support moves help control the pace of the match, punish switching, weaken walls, and enable sweepers.
+
+Hazards like Stealth Rock, Spikes, and Toxic Spikes damage opponents when they switch in. Maintaining hazards increases long-term advantage, while removing them with Rapid Spin or Defog supports fragile offensive Pokémon.
+
+Typing and abilities strongly influence matchups. STAB (Same-Type Attack Bonus) gives 1.5× power to moves matching the user’s type. Immunities (e.g., Ground vs Levitate, Ghost vs Normal/Fighting) make some moves worthless. Good play avoids attacking into immunities and uses resistances wisely.
+
+Good team synergy means teammates cover each other’s weaknesses. Example: a Flying-type covering a Grass weakness, or a Water/Ground absorbing Electric moves. Competitive actions should preserve synergy rather than leaving teammates exposed to their worst matchups.
+
+Predictive switching and pivoting (such as via U-turn or Volt Switch) help maintain momentum. Switching into resistances or immunities reduces risk and forces the opponent into disadvantageous positions.
+
+Setup moves create future advantage. Using Dragon Dance on a forced switch is strong; using it when you are about to be KO’d is bad. Efficient turn usage is essential; wasted turns let the opponent set up or switch safely.
+
+Bad strategy includes stacking multiple moves of the same type without purpose (e.g., Fire Blast + Flamethrower + Ember), using Hyper Beam-style recharge moves that leave you vulnerable, choosing extremely low-power moves when stronger ones exist, attacking into clearly bad matchups, or using setup moves in losing positions.
+
+Strong competitive play involves pressuring the opponent, forcing switches, exploiting weaknesses, spreading status, using reliable and accurate moves unless high-risk moves are justified by payoff, and preventing opponents from safely setting up.
+
+Reward-worthy behavior includes: enabling a sweep, gaining advantageous matchups, using coverage hits, punishing switches with hazards, protecting your own sweeper, burning physical attackers, paralyzing fast threats, using Substitute to scout, maintaining momentum with pivots, and eliminating opposing counters.
+
+Penalty-worthy behavior includes: wasting turns, switching into super-effective attacks without purpose, attacking into immunities, sacrificing key team members early, letting opponents set up freely, and using moves that provide no strategic value.
+
+All reinforcement signals should reflect whether the action increased or decreased long-term victory chances based on these principles.
+
+Additional strategic clarifications:
+
+Momentum: The advantage gained when your move forces the opponent to react (switch, defend, heal, or reposition). Moves like U-turn and Volt Switch preserve momentum. Gaining momentum is favorable; losing momentum is unfavorable.
+
+Win condition: The primary plan that will eventually secure victory, such as sweeping with a setup attacker or stalling with hazards. Actions that advance the win condition should be rewarded. Actions that sabotage the win condition should be penalized.
+
+Matchups: A favorable matchup occurs when the active Pokémon threatens the opponent through typing, speed, or coverage. A bad matchup occurs when the opponent threatens you. Switching into favorable matchups should be rewarded; switching into bad matchups should be penalized.
+
+Substitute interaction: Attacking into Substitute without breaking it is considered a wasted turn and should be penalized.
+
+Prediction: Using moves that anticipate opponent switching, such as hitting counters with appropriate coverage, represents high-level competitive play and should be rewarded.
+
+Forcing switches: Actions that cause the opponent to switch are favorable because they generate momentum and apply hazard damage.
+
+Priority moves: Using priority moves to secure KOs or prevent the opponent from sweeping is strategically valuable.
+
+Setup opportunities: Using setup moves is only favorable when the agent is not in danger of being KO’d or crippled. Good opportunities include forcing a switch or acting behind a Substitute.
+
+Status immunities: Using status moves on Pokémon immune to them (e.g., Toxic on Steel or Poison types; Thunder Wave on Ground or Electric types) should be penalized.
+
+Sweeper preservation: Sending a sweeper into a losing matchup or where it will take unnecessary damage is detrimental unless it secures an essential KO.
+
+# Reward design notes for Pokémon Q-learning (R(s, a, s'))
+
+Goal:
+The reward function should push the agent toward strong competitive Pokémon play.
+The reward should reflect progress toward winning, maintaining team synergy, making efficient trades, and using competitive strategies correctly. There should be no fixed numeric weights here; the engineer or model may decide actual scales later.
+
+General principles:
+- Winning is the primary objective, so the final victory reward should dominate.
+- Each turn should move the game state closer to a favorable win condition.
+- Good actions advance your board position; bad actions weaken it.
+- The agent should learn competitive principles such as using coverage, preserving synergy, setting hazards, switching effectively, and avoiding obviously bad moves.
+
+State/transition information to consider:
+From each transition (s → a → s'), the agent can examine:
+- Total HP on both teams before and after the action.
+- Number of fainted Pokémon on both teams before and after.
+- Hazards on the field (Stealth Rock, Spikes, Toxic Spikes) and whether they were added or removed.
+- Stat boosts gained or lost by the active Pokémon (e.g., boosts from Dragon Dance, Swords Dance, Calm Mind, etc.).
+- Status conditions inflicted or received (burn, paralysis, toxic, sleep, etc.).
+- Whether the game ended and which side won.
+- Whether a switch created a good matchup or a bad matchup.
+- What move was used and its category (damaging, setup, support, etc.).
+- Whether the chosen action aligns with competitive principles.
+
+Reward concepts (no numeric values provided):
+
+• Improvements in board state:
+  - Damaging opponents or weakening their key Pokémon is desirable.
+  - Protecting your own HP and avoiding unnecessary damage is desirable.
+  - Knocking out opposing Pokémon is beneficial.
+  - Losing your own Pokémon is detrimental.
+
+• Competitive support actions:
+  - Adding hazards to the opponent’s field is favorable.
+  - Having your hazards removed is unfavorable.
+  - Gaining stat boosts that improve your ability to sweep is favorable.
+  - Having your stats lowered by the opponent is unfavorable.
+  - Inflicting status conditions on the opponent is favorable.
+  - Receiving status conditions is unfavorable.
+
+• Good switching:
+  - Switching into resisted or immune hits is favorable.
+  - Switching into super-effective hits or predictable danger is unfavorable.
+
+• Move quality and competitive correctness:
+  - Using strong, efficient, or strategically meaningful moves is favorable.
+  - Using “terrible” or competitively non-viable moves is unfavorable.
+    Examples include:
+      - Hyper Beam–style recharge moves without appropriate context.
+      - Very weak filler moves when better moves are available.
+      - Duplicate attacking moves of the same type that serve no coverage purpose.
+  - Using strong coverage moves, setup moves, or status moves in the right context is favorable.
+
+• Strategic direction:
+  - Actions that support your team's win condition (e.g., enabling a sweeper, enabling a stall core) are favorable.
+  - Actions that weaken your long-term game plan (e.g., unnecessary risk, misusing your win-condition Pokémon) are unfavorable.
+
+• Terminal outcome:
+  - Winning the entire battle should yield the largest positive reward.
+  - Losing the battle should yield the largest penalty.
+  - The final game outcome should overshadow all small intermediate shaping rewards so the agent always prioritizes actually winning.
+
+Important notes:
+- This document intentionally contains no numeric weights.
+- Actual scalar reward values should be chosen separately by the implementer.
+- The purpose of this file is only to guide Copilot and Q-learning design qualitatively.
+
+New strategies: 
+
+NEW SECTION: Prediction Level Framework (0–5)
+
+Prediction levels the agent must understand:
+Level 0: Attack what is directly in front.
+Level 1: Attack what is likely to switch in.
+Level 2: Use a neutral play that is safe vs staying and switching (status, safe moves).
+Level 3: Switch to a Pokemon that beats both staying and switching.
+Level 4: High-payoff aggressive read justified by strong information.
+Level 5: Pure read with high risk and low information support.
+
+Reward:
+Using level 2–3 when uncertainty is high.
+Using level 4 only when supported by previous turn evidence.
+Adapting prediction level based on opponent behavior.
+
+Penalty:
+Using level 5 with no justification.
+Overpredicting with no information.
+Remaining stuck at level 0 or level 1.
+
+NEW SECTION: Double Switching Logic
+
+Definition: Switching expecting the opponent to switch, gaining tempo, trapping threats, or adding hazard pressure.
+
+Reward:
+Double switching when opponent's response is predictable from earlier information.
+Using doubles to enable trappers (e.g., Dugtrio).
+Using doubles to maintain or regain tempo.
+
+Penalty:
+Double switching into losing matchups.
+Repeating predictable double patterns.
+Using double switches without information advantage.
+
+NEW SECTION: Information Deduction Rules
+
+The agent must infer hidden information from:
+Leftovers or sandstorm order to deduce speed.
+Damage rolls to deduce defensive vs offensive stats.
+Revealed moves to deduce set type.
+Switch patterns to deduce counters, walls, or trappers.
+Team composition to predict unrevealed Pokemon.
+
+Reward:
+Updating beliefs when new info appears.
+Adjusting choices based on deductions.
+
+Penalty:
+Ignoring revealed info.
+Treating known sets as unknown.
+Attacking into obviously wrong assumptions.
+
+NEW SECTION: Conservative vs Greedy Risk Management
+
+Conservative principles (preferred early-game):
+Assume opponents may have dangerous coverage until proven otherwise.
+Scout with Protect or safe switches.
+Use low-risk choices when uncertainty is high.
+
+Greedy principles (situational):
+Take calculated risks only when payoff is high and supported by evidence.
+
+Reward:
+Respecting potential OHKOs early-game.
+Scouting dangerous moves before committing.
+
+Penalty:
+Staying in vs possible KO coverage for no reason.
+Making “I hope he doesn’t have it” decisions.
+Being greedy early with no information.
+
+NEW SECTION: Tilt-Avoidance Behavior
+
+Penalty:
+Reckless aggression immediately after bad RNG.
+Ignoring earlier deductions due to frustration-like behavior.
+Sudden high-risk predictions after a negative event.
+
+Reward:
+Maintaining consistent, logical play after bad luck.
+Returning to conservative reasoning after setbacks.
+
+NEW SECTION: Opponent Tendency Adaptation
+
+Reward:
+Detecting when opponents always attack or always switch.
+Adjusting prediction level based on their habits.
+Punishing predictable behavior.
+
+Penalty:
+Never adapting to opponent patterns.
+Using high-level predictions against low-prediction opponents.
+
+NEW SECTION: Threat and Team Structure Awareness
+
+Reward teams that:
+Cover all major competitive threats.
+Have hazard control (spinner, Magneton, or natural immunities).
+Have at least one phazer.
+Have at least one status absorber or Natural Cure user.
+Have a clear win condition.
+Have good resistance and role coverage.
+
+Penalty:
+Teams weak to common OU threats.
+Teams with no hazard answer.
+Teams with repetitive or predictable structure.
+Teams with poor synergy.
+
+NEW SECTION: Episode-Level Improvement Signals
+
+Reward across many games:
+Making fewer repeated mistakes (e.g., fewer attacks into immunities).
+Improved hazard usage over time.
+Better prediction-level choices.
+More stable responses to RNG.
+Better coverage of common threats in team choices.
+
+Penalty across many games:
+Repeating the same structural weakness.
+Repeating risky incorrect behavior.
+Never adjusting to common metagame patterns.
+Losses caused by the same type of misread multiple times.
