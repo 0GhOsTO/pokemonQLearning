@@ -165,6 +165,9 @@ public class CustomRewardFunction
     }
 
     private double calcBoostReward(PokemonView before, PokemonView after, boolean isMine) {
+        if (before == null || after == null) {
+            return 0.0;
+        }
         double boost = 0.0;
 
         Stat[] checkStats = {
@@ -187,9 +190,9 @@ public class CustomRewardFunction
                     multiplier = 1.5; // Prioritize offensive/speed stats for sweepers.
                 }
                 if (isMine) {
-                    boost += diff * 30.0 * multiplier; // Reward my boosts.
+                    boost += diff * 25.0 * multiplier; // Reward my boosts.
                 } else {
-                    boost -= diff * 30.0 * multiplier; // Penalize opponent's boosts.
+                    boost -= diff * 25.0 * multiplier; // Penalize opponent's boosts.
                 }
             }
         }
