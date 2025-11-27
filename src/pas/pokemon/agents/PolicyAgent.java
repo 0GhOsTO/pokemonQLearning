@@ -15,8 +15,6 @@ import edu.bu.pas.pokemon.nn.Model;
 import edu.bu.pas.pokemon.nn.models.Sequential;
 import edu.bu.pas.pokemon.nn.layers.Dense;
 import edu.bu.pas.pokemon.nn.layers.ReLU;
-import edu.bu.pas.pokemon.nn.layers.Tanh;
-import edu.bu.pas.pokemon.nn.layers.Sigmoid;
 
 // JAVA PROJECT IMPORTS
 import src.pas.pokemon.senses.CustomSensorArray;
@@ -53,15 +51,14 @@ public class PolicyAgent
 
     @Override
     public Model initModel() {
-        // TODO: create your neural network
-
-        // currently this creates a one-hidden-layer network
         Sequential qFunction = new Sequential();
-        qFunction.add(new Dense(75, 256));
-        qFunction.add(new Tanh());
+        qFunction.add(new Dense(73, 512)); // Larger first layer to capture more patterns
+        qFunction.add(new ReLU());
+        qFunction.add(new Dense(512, 256));
+        qFunction.add(new ReLU());
         qFunction.add(new Dense(256, 128));
         qFunction.add(new ReLU());
-        qFunction.add(new Dense(128, 1)); // ouput
+        qFunction.add(new Dense(128, 1)); // Q-value output
 
         return qFunction;
     }

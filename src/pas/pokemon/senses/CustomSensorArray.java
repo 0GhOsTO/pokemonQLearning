@@ -68,7 +68,7 @@ public class CustomSensorArray extends SensorArray {
             sensors.add(0.0);
         }
 
-        // 75 features in total.
+        // 73 features total (20+20+4+4+6+17+3)
 
         // Convert List<Double> to Matrix row vector (1 x n)
         Matrix result = Matrix.zeros(1, sensors.size());

@@ -62,9 +62,9 @@ public class CustomRewardFunction
         // If the battle is over ...
         if (nextState.isOver()) {
             if (teamDead(oppNxtTeam)) {
-                reward += 2500.0; // Win
+                reward += 1500.0; // Win (reduced from 2500 to balance with other rewards)
             } else if (teamDead(myNxtTeam)) {
-                reward -= 2500.0; // Lose
+                reward -= 1500.0; // Lose
             }
             // Game is over
             return reward;
@@ -124,9 +124,16 @@ public class CustomRewardFunction
 
         if (action != null && action.getPower() != null) {
             Integer moveP = action.getPower();
-            // Plenalty for the bad move.
+            // Penalty for the bad move.
             if (moveP < 40 && moveP > 0) {
                 reward -= 20.0; // Penalize low power moves.
+            }
+        }
+
+        // Reward for forcing opponent to switch (they lost their active Pokemon)
+        if (oppPokemon != null && oppNxtPokemon != null) {
+            if (!oppPokemon.hasFainted() && oppPokemon != oppNxtPokemon) {
+                reward += 150.0; // Forced switch is good
             }
         }
 
