@@ -23,6 +23,8 @@ public class PolicyAgent
         extends NeuralQAgent {
 
     private int epCount = 0;
+    private double bestWRate = -1.0;
+    private String bestModelPath = null;
 
     public PolicyAgent() {
         super();
@@ -172,6 +174,28 @@ public class PolicyAgent
     @Override
     public void afterGameEnds(BattleView view) {
         epCount++;
+    }
+
+    // Save the model if it has the best win rate so far.
+    public void saveIfBest(double curWinRate, String outputPath) {
+        if (curWinRate > bestWRate) {
+            bestWRate = curWinRate;
+            bestModelPath = outputPath + "_best.model";
+            try {
+                this.getModel().save(bestModelPath);
+                System.out.println("NEW BEST MODEL SAVED! Win rate: " + String.format("%.2f%%", curWinRate * 100));
+            } catch (Exception e) {
+                System.err.println("Failed to save best model: " + e.getMessage());
+            }
+        }
+    }
+
+    public double getBestWinRate() {
+        return bestWRate;
+    }
+
+    public String getBestModelPath() {
+        return bestModelPath;
     }
 
 }
