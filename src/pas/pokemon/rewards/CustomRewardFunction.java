@@ -47,11 +47,12 @@ public class CustomRewardFunction
             final BattleView nextState) {
         double reward = 0.0;
 
-        // Treating team 2 as the oponent.
-        TeamView myTeam = state.getTeam1View();
-        TeamView oppTeam = state.getTeam2View();
-        TeamView myNxtTeam = nextState.getTeam1View();
-        TeamView oppNxtTeam = nextState.getTeam2View();
+        // Use getTeamIdx() to determine which team is ours
+        int myTeamIdx = this.getTeamIdx();
+        TeamView myTeam = (myTeamIdx == 0) ? state.getTeam1View() : state.getTeam2View();
+        TeamView oppTeam = (myTeamIdx == 0) ? state.getTeam2View() : state.getTeam1View();
+        TeamView myNxtTeam = (myTeamIdx == 0) ? nextState.getTeam1View() : nextState.getTeam2View();
+        TeamView oppNxtTeam = (myTeamIdx == 0) ? nextState.getTeam2View() : nextState.getTeam1View();
 
         // Get the active pokemon for the both team.
         PokemonView myPokemon = myTeam.getActivePokemonView();

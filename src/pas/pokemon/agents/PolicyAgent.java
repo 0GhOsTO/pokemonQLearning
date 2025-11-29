@@ -23,12 +23,23 @@ public class PolicyAgent
         extends NeuralQAgent {
 
     private int epCount = 0;
-    private double bestWinRate = -1.0;
-    private String bestModelPath = null;
-    private int gameCountInCycle = 0;
+    private boolean isTraining = true;
+    private double epsilon = 0.6;
 
     public PolicyAgent() {
         super();
+    }
+
+    @Override
+    public void train() {
+        // Called before the training starts. 
+        isTraining = true;
+    }
+
+    @Override
+    public void eval() {
+        // Called before evaluation starts
+        isTraining = false;
     }
 
     public void initializeSenses(Namespace args) {
@@ -139,50 +150,30 @@ public class PolicyAgent
 
     @Override
     public MoveView getMove(BattleView view) {
-        // Reset counter at start of new cycle
-        if (gameCountInCycle >= 170) {
-            gameCountInCycle = 0;
-        }
-
-        gameCountInCycle++;
-
-        // First 150 games are training (exploration), next 20 are eval (pure
-        // exploitation)
-        boolean isTraining = (gameCountInCycle <= 150);
-
-        // Epsilon decay tuned for long training runs
-        // Start high for broad exploration, decay gradually to maintain some
-        // exploration
-        double epsilon = 0.0;
         if (isTraining) {
-            // Increment episode counter only during training
             epCount++;
-
-            // Decay from 0.6 to 0.1 over first 500k training episodes
-            if (epCount < 500000) {
-                epsilon = 0.6 - (0.5 * epCount / 500000.0);
+            // Decay epsilon from 0.6 to 0.05 over 100000 training games
+            if (epCount < 100000) {
+                epsilon = 0.6 - (0.55 * epCount / 100000.0);
             } else {
-                epsilon = 0.1;
+                epsilon = 0.05; // Maintain small exploration
+            }
+
+            // Explore with probability epsilon during training
+            if (Math.random() < epsilon) {
+                List<MoveView> moves = this.getPotentialMoves(view);
+                if (moves != null && !moves.isEmpty()) {
+                    return moves.get((int) (Math.random() * moves.size()));
+                }
             }
         }
-
-        if (Math.random() < epsilon) {
-            // Explore: random move
-            List<MoveView> moves = this.getPotentialMoves(view);
-            if (moves != null && !moves.isEmpty()) {
-                return moves.get((int) (Math.random() * moves.size()));
-            }
-        }
-
-        // Exploit
+        // During eval or when not exploring, exploit
         return this.argmax(view);
     }
 
     @Override
     public void afterGameEnds(BattleView view) {
-        // Episode counter is now incremented in getMove() during training only
-        // This ensures epsilon decay is based on actual training episodes, not eval
-        // games
+        // No need to track episodes here anymore - done in getMove()
     }
 
 }

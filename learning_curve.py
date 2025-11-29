@@ -67,7 +67,8 @@ def main() -> None:
     ax1.tick_params(axis='y', labelcolor=color1)
 
     ax2 = ax1.twinx()
-    color2 = "tab:red"
+    # color2 = "tab:invisible"
+    color2 = "none"
     ax2.set_ylabel(win_label, color=color2)
     ax2.plot(cycles, win_series, color=color2, label=win_label)
     ax2.tick_params(axis='y', labelcolor=color2)

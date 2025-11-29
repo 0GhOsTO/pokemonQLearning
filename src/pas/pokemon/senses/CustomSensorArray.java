@@ -30,7 +30,7 @@ public class CustomSensorArray extends SensorArray {
         // model is a q-based model
         List<Double> sensors = new ArrayList<>();
 
-        // Check which one is the team.
+        // For now, assume Team1 is ours - agent should handle perspective
         TeamView myTeam = state.getTeam1View();
         TeamView oppTeam = state.getTeam2View();
 
