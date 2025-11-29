@@ -22,13 +22,13 @@ public class CustomRewardFunction
     }
 
     public double getLowerBound() {
-        // TODO: change this. Reward values must be finite!
-        return -5000.0;
+        // Reward val
+        return -1000.0;
     }
 
     public double getUpperBound() {
-        // TODO: change this. Reward values must be finite!
-        return 5000.0;
+        // Reward val
+        return 1000.0;
     }
 
     // NOT USED
@@ -62,34 +62,34 @@ public class CustomRewardFunction
         // If the battle is over ...
         if (nextState.isOver()) {
             if (teamDead(oppNxtTeam)) {
-                reward += 1500.0; // Win (reduced from 2500 to balance with other rewards)
+                reward += 800.0; // Win
             } else if (teamDead(myNxtTeam)) {
-                reward -= 1500.0; // Lose
+                reward -= 800.0; // Lose
             }
             // Game is over
-            return reward;
+            return Math.max(getLowerBound(), Math.min(getUpperBound(), reward));
         }
 
         // Pokemon dead.
         if (oppPokemon != null && oppNxtPokemon != null) {
             if (!oppPokemon.hasFainted() && oppNxtPokemon.hasFainted()) {
-                reward += 800.0; // Opponent pokemon dead.
+                reward += 400.0; // Opponent pokemon dead.
             }
         }
         if (myPokemon != null && myNxtPokemon != null) {
             if (!myPokemon.hasFainted() && myNxtPokemon.hasFainted()) {
-                reward -= 800.0; // My pokemon dead.
+                reward -= 400.0; // My pokemon dead.
             }
         }
 
         // Pokemon damaging.
         if (oppPokemon != null && oppNxtPokemon != null) {
             double oppHpDiff = oppPokemon.getCurrentStat(Stat.HP) - oppNxtPokemon.getCurrentStat(Stat.HP);
-            reward += oppHpDiff * 1.2; // Opponent getting damaged.
+            reward += oppHpDiff * 0.8; // Opponent getting damaged.
         }
         if (myPokemon != null && myNxtPokemon != null) {
             double myHpDiff = myPokemon.getCurrentStat(Stat.HP) - myNxtPokemon.getCurrentStat(Stat.HP);
-            reward -= myHpDiff * 1.2; // My pokemon getting damaged.
+            reward -= myHpDiff * 0.8; // My pokemon getting damaged.
         }
 
         // Condition based rewarding.
@@ -120,22 +120,24 @@ public class CustomRewardFunction
         int prevOppTeamTotHP = getTeamTotHP(oppTeam);
 
         int hpDiff = (prevMyTeamTotHP - myTeamTotHP) - (prevOppTeamTotHP - oppTeamTotHP);
-        reward -= hpDiff / 40.0; // Team HP difference, we reward.
+        reward -= hpDiff / 50.0; // Team HP difference
 
         if (action != null && action.getPower() != null) {
             Integer moveP = action.getPower();
-            // Plenalty for the bad move.
+            // Penalty for the bad move.
             if (moveP < 40 && moveP > 0) {
-                reward -= 20.0; // Penalize low power moves.
+                reward -= 10.0; // Penalize low power moves.
             }
         }
 
         if (oppPokemon != null && oppNxtPokemon != null) {
             if (!oppPokemon.hasFainted() && oppPokemon != oppNxtPokemon) {
-                reward += 150.0; // Forced switch is good
+                reward += 80.0; // Forced switch is good
             }
         }
 
+        // Clamp final reward to bounds for stable learning
+        reward = Math.max(getLowerBound(), Math.min(getUpperBound(), reward));
         return reward;
     }
 
@@ -193,12 +195,12 @@ public class CustomRewardFunction
             if (diff != 0) {
                 double multiplier = 1.0;
                 if (stat == Stat.ATK || stat == Stat.SPATK || stat == Stat.SPD) {
-                    multiplier = 1.5; // Prioritize offensive/speed stats for sweepers.
+                    multiplier = 1.3; // Prioritize offensive/speed stats for sweepers.
                 }
                 if (isMine) {
-                    boost += diff * 25.0 * multiplier; // Reward my boosts.
+                    boost += diff * 15.0 * multiplier; // Reward my boosts.
                 } else {
-                    boost -= diff * 25.0 * multiplier; // Penalize opponent's boosts.
+                    boost -= diff * 15.0 * multiplier; // Penalize opponent's boosts.
                 }
             }
         }

@@ -68,7 +68,15 @@ public class CustomSensorArray extends SensorArray {
             sensors.add(0.0);
         }
 
-        // 73 features total (20+20+4+4+6+17+3)
+        // 73 features total (20+20+4+4+6+16+3)
+        // Enforce exactly 73 features: pad with zeros or truncate if needed
+        final int EXPECTED_FEATURES = 73;
+        while (sensors.size() < EXPECTED_FEATURES) {
+            sensors.add(0.0);
+        }
+        if (sensors.size() > EXPECTED_FEATURES) {
+            sensors = sensors.subList(0, EXPECTED_FEATURES);
+        }
 
         // Convert List<Double> to Matrix row vector (1 x n)
         Matrix result = Matrix.zeros(1, sensors.size());
@@ -227,8 +235,8 @@ public class CustomSensorArray extends SensorArray {
         List<Double> features = new ArrayList<>();
 
         if (move == null) {
-            // return the zero if there is no move.
-            for (int i = 0; i < 18; i++) {
+            // return zeros if there is no move
+            for (int i = 0; i < 16; i++) {
                 features.add(0.0);
             }
             return features;

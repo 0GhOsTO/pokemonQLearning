@@ -23,8 +23,9 @@ public class PolicyAgent
         extends NeuralQAgent {
 
     private int epCount = 0;
-    private double bestWRate = -1.0;
+    private double bestWinRate = -1.0;
     private String bestModelPath = null;
+    private int gameCountInCycle = 0;
 
     public PolicyAgent() {
         super();
@@ -138,33 +139,39 @@ public class PolicyAgent
 
     @Override
     public MoveView getMove(BattleView view) {
-        // TODO: change this to include random exploration during training and maybe use
-        // the transition model to make
-        // good predictions?
-        // if you choose to use the transition model you might want to also override the
-        // makeGroundTruth(...) method
-        // to not use temporal difference learning
+        // Reset counter at start of new cycle
+        if (gameCountInCycle >= 170) {
+            gameCountInCycle = 0;
+        }
 
-        // currently always tries to argmax the learned model
-        // this is not a good idea to always do when training. When playing evaluation
-        // games you *do* want to always
-        // argmax your model, but when training our model may not know anything yet! So,
-        // its a good idea to sometime
-        // during training choose *not* to argmax the model and instead choose something
-        // new at random.
+        gameCountInCycle++;
 
-        // HOW that randomness works and how often you do it are up to you, but it
-        // *will* affect the quality of your
-        // learned model whether you do it or not!
-        // Epsilon-greedy exploration: decay from 0.5 to 0.05 over 40k episodes
-        double epsilon = (epCount < 40000) ? 0.5 - (0.45 * epCount / 40000.0) : 0.05;
+        // First 150 games are training (exploration), next 20 are eval (pure
+        // exploitation)
+        boolean isTraining = (gameCountInCycle <= 150);
+
+        // Epsilon decay tuned for long training runs
+        // Start high for broad exploration, decay gradually to maintain some
+        // exploration
+        double epsilon = 0.0;
+        if (isTraining) {
+            // Increment episode counter only during training
+            epCount++;
+
+            // Decay from 0.6 to 0.1 over first 500k training episodes
+            if (epCount < 500000) {
+                epsilon = 0.6 - (0.5 * epCount / 500000.0);
+            } else {
+                epsilon = 0.1;
+            }
+        }
+
         if (Math.random() < epsilon) {
             // Explore: random move
             List<MoveView> moves = this.getPotentialMoves(view);
             if (moves != null && !moves.isEmpty()) {
                 return moves.get((int) (Math.random() * moves.size()));
             }
-            // argmax
         }
 
         // Exploit
@@ -173,29 +180,9 @@ public class PolicyAgent
 
     @Override
     public void afterGameEnds(BattleView view) {
-        epCount++;
-    }
-
-    // Save the model if it has the best win rate so far.
-    public void saveIfBest(double curWinRate, String outputPath) {
-        if (curWinRate > bestWRate) {
-            bestWRate = curWinRate;
-            bestModelPath = outputPath + "_best.model";
-            try {
-                this.getModel().save(bestModelPath);
-                System.out.println("NEW BEST MODEL SAVED! Win rate: " + String.format("%.2f%%", curWinRate * 100));
-            } catch (Exception e) {
-                System.err.println("Failed to save best model: " + e.getMessage());
-            }
-        }
-    }
-
-    public double getBestWinRate() {
-        return bestWRate;
-    }
-
-    public String getBestModelPath() {
-        return bestModelPath;
+        // Episode counter is now incremented in getMove() during training only
+        // This ensures epsilon decay is based on actual training episodes, not eval
+        // games
     }
 
 }
